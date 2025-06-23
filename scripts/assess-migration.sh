@@ -47,7 +47,6 @@ check_disk_space() {
     echo
     echo "Recommendation: Ensure at least 100GB free space for migration"
 }
-
 # Function to estimate migration time
 estimate_migration_time() {
     echo
@@ -108,3 +107,58 @@ generate_checklist() {
 □ Schedule migration during low-usage period
 □ Prepare DNS change if URL is changing
 □ Review security groups/firewall rules for new deployment
+EOF
+}
+
+# Main assessment flow
+echo "This script will assess your Jenkins instance for migration readiness"
+echo
+
+# Check Jenkins accessibility
+if ! check_jenkins_url; then
+    echo "Please ensure Jenkins is running and accessible"
+fi
+
+# Check disk space
+check_disk_space
+
+# Check prerequisites
+check_prerequisites
+
+# Estimate migration time
+estimate_migration_time
+
+# Generate checklist
+generate_checklist
+
+# Generate assessment report
+REPORT_FILE="migration-assessment-$(date +%Y%m%d_%H%M%S).txt"
+{
+    echo "Jenkins Migration Assessment Report"
+    echo "=================================="
+    echo "Generated: $(date)"
+    echo "Jenkins URL: ${JENKINS_URL:-Not specified}"
+    echo
+    echo "Environment: $OSTYPE"
+    echo
+    echo "Prerequisites Check:"
+    echo "- Docker: $(command -v docker &> /dev/null && echo \"Installed\" || echo \"Not installed\")"
+    echo "- kubectl: $(command -v kubectl &> /dev/null && echo \"Installed\" || echo \"Not installed\")"
+    echo "- Helm: $(command -v helm &> /dev/null && echo \"Installed\" || echo \"Not installed\")"
+    echo
+    echo "Recommendations:"
+    echo "1. Install any missing prerequisites"
+    echo "2. Ensure adequate disk space (100GB+ free)"
+    echo "3. Complete the pre-migration checklist"
+    echo "4. Schedule migration during maintenance window"
+    echo "5. Test backup and restore procedures first"
+} > "$REPORT_FILE"
+
+echo
+echo "Assessment complete! Report saved to: $REPORT_FILE"
+echo
+echo "Next steps:"
+echo "1. Review the assessment report"
+echo "2. Address any missing prerequisites"
+echo "3. Complete the pre-migration checklist"
+echo "4. Run backup script when ready to migrate"
