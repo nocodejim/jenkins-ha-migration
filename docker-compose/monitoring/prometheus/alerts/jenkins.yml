@@ -1,0 +1,53 @@
+groups:
+  - name: jenkins
+    interval: 30s
+    rules:
+      # Jenkins Down
+      - alert: JenkinsDown
+        expr: up{job="jenkins"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Jenkins is down"
+          description: "Jenkins instance {{ $labels.instance }} is down"
+
+      # High Memory Usage
+      - alert: JenkinsHighMemory
+        expr: jenkins_memory_usage > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Jenkins memory usage is {{ $value }}%"
+
+      # High Queue Size
+      - alert: JenkinsHighQueueSize
+        expr: jenkins_queue_size > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High build queue"
+          description: "Jenkins queue size is {{ $value }}"
+
+      # No Idle Executors
+      - alert: JenkinsNoIdleExecutors
+        expr: sum(jenkins_node_idle_executors) == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No idle executors"
+          description: "All Jenkins executors are busy"
+
+      # Disk Space Low
+      - alert: JenkinsDiskSpaceLow
+        expr: jenkins_disk_usage > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space"
+          description: "Jenkins disk usage is {{ $value }}%"

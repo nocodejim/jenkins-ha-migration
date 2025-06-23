@@ -1,0 +1,86 @@
+version: '3.8'
+
+x-jenkins-common: &jenkins-common
+  image: jenkins/jenkins:${JENKINS_VERSION:-2.426.3-lts-jdk11}
+  user: "1000:1000"
+  environment:
+    - JAVA_OPTS=-Xmx${JENKINS_MEMORY_LIMIT:-2g} -Xms${JENKINS_MEMORY_LIMIT:-2g} -Djenkins.install.runSetupWizard=false
+    - JENKINS_OPTS=--httpPort=8080
+    - JENKINS_ADMIN_ID=${JENKINS_ADMIN_USER:-admin}
+    - JENKINS_ADMIN_PASSWORD=${JENKINS_ADMIN_PASSWORD:-ChangeMe123!}
+  volumes:
+    - jenkins_home:/var/jenkins_home
+    - /var/run/docker.sock:/var/run/docker.sock
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8080/login"]
+    interval: 30s
+    timeout: 10s
+    retries: 5
+    start_period: 90s
+  networks:
+    - jenkins-net
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  jenkins-1:
+    <<: *jenkins-common
+    container_name: jenkins-1
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=8080"
+      - "prometheus.io/path=/prometheus"
+
+  jenkins-2:
+    <<: *jenkins-common
+    container_name: jenkins-2
+    ports:
+      - "8081:8080"
+      - "50001:50000"
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=8080"
+      - "prometheus.io/path=/prometheus"
+
+  nginx:
+    image: nginx:alpine
+    container_name: jenkins-lb
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - jenkins-1
+      - jenkins-2
+    restart: unless-stopped
+    networks:
+      - jenkins-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  jenkins_home:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${JENKINS_HOME_PATH:-./jenkins_home}
+
+networks:
+  jenkins-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

@@ -1,0 +1,136 @@
+pipeline {
+    agent any
+    
+    options {
+        timestamps()
+        timeout(time: 1, unit: 'HOURS')
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
+    
+    environment {
+        DOCKER_REGISTRY = credentials('docker-registry')
+        KUBECTL_CREDS = credentials('kubectl-config')
+        SLACK_WEBHOOK = credentials('slack-webhook')
+    }
+    
+    stages {
+        stage('Validate') {
+            parallel {
+                stage('Lint YAML') {
+                    steps {
+                        sh 'yamllint -c .yamllint.yml .'
+                    }
+                }
+                stage('Lint Shell') {
+                    steps {
+                        sh 'find . -name "*.sh" -type f | xargs shellcheck'
+                    }
+                }
+                stage('Lint Helm') {
+                    steps {
+                        sh 'helm lint kubernetes/helm'
+                    }
+                }
+            }
+        }
+        
+        stage('Test') {
+            parallel {
+                stage('Test Helm') {
+                    steps {
+                        sh 'helm template jenkins kubernetes/helm'
+                    }
+                }
+                stage('Test Docker') {
+                    steps {
+                        sh 'cd docker-compose && docker-compose config'
+                    }
+                }
+            }
+        }
+        
+        stage('Security Scan') {
+            parallel {
+                stage('Trivy Scan') {
+                    steps {
+                        sh 'trivy fs --security-checks vuln,config .'
+                    }
+                }
+                stage('Checkov Scan') {
+                    steps {
+                        sh 'checkov -d . --framework kubernetes,helm,dockerfile'
+                    }
+                }
+            }
+        }
+        
+        stage('Build') {
+            when {
+                branch pattern: "(main|develop)", comparator: "REGEXP"
+            }
+            steps {
+                script {
+                    docker.withRegistry("https://${DOCKER_REGISTRY}", 'docker-creds') {
+                        def customImage = docker.build("jenkins-ha:${env.BUILD_ID}")
+                        customImage.push()
+                        customImage.push('latest')
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy to Staging') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                sh '''
+                    export KUBECONFIG=$KUBECTL_CREDS
+                    helm upgrade --install jenkins-staging ./kubernetes/helm \
+                        --namespace jenkins-staging \
+                        --create-namespace \
+                        --values kubernetes/helm/values-staging.yaml
+                '''
+            }
+        }
+        
+        stage('Deploy to Production') {
+            when {
+                branch 'main'
+            }
+            input {
+                message "Deploy to production?"
+                ok "Deploy"
+            }
+            steps {
+                sh '''
+                    export KUBECONFIG=$KUBECTL_CREDS
+                    helm upgrade --install jenkins ./kubernetes/helm \
+                        --namespace jenkins-prod \
+                        --create-namespace \
+                        --values kubernetes/helm/values-prod.yaml
+                '''
+            }
+        }
+    }
+    
+    post {
+        success {
+            sh """
+                curl -X POST -H 'Content-type: application/json' \
+                    --data '{"text":"✅ Build Successful: ${env.JOB_NAME} - ${env.BUILD_NUMBER}"}' \
+                    ${SLACK_WEBHOOK}
+            """
+        }
+        failure {
+            sh """
+                curl -X POST -H 'Content-type: application/json' \
+                    --data '{"text":"❌ Build Failed: ${env.JOB_NAME} - ${env.BUILD_NUMBER}"}' \
+                    ${SLACK_WEBHOOK}
+            """
+        }
+        always {
+            cleanWs()
+        }
+    }
+}

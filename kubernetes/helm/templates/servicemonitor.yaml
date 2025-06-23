@@ -1,0 +1,18 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "jenkins-ha.fullname" . }}
+  namespace: {{ .Values.monitoring.serviceMonitor.namespace | default .Values.namespace }}
+  labels:
+    {{- include "jenkins-ha.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "jenkins-ha.selectorLabels" . | nindent 6 }}
+  endpoints:
+  - port: http
+    interval: {{ .Values.monitoring.serviceMonitor.interval }}
+    scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout }}
+    path: /prometheus
+{{- end }}

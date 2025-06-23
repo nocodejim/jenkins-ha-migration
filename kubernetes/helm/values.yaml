@@ -1,0 +1,194 @@
+# Default values for jenkins-ha
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+## @section Global parameters
+## Global Docker image parameters
+## Please, note that this will override the image parameters, including dependencies, configured to use the global value
+##
+global:
+  ## @param global.imageRegistry Global Docker image registry
+  ##
+  imageRegistry: ""
+  ## @param global.imagePullSecrets Global Docker registry secret names as an array
+  ##
+  imagePullSecrets: []
+  ## @param global.storageClass Global StorageClass for Persistent Volume(s)
+  ##
+  storageClass: ""
+
+## @section Common parameters
+##
+
+## @param nameOverride String to partially override jenkins.fullname template (will maintain the release name)
+##
+nameOverride: ""
+## @param fullnameOverride String to fully override jenkins.fullname template
+##
+fullnameOverride: ""
+## @param namespace Namespace to deploy the release
+##
+namespace: jenkins-prod
+
+## @section Jenkins parameters
+##
+
+## Jenkins image
+## @param image.repository Jenkins image repository
+## @param image.tag Jenkins image tag
+## @param image.pullPolicy Jenkins image pull policy
+##
+image:
+  repository: jenkins/jenkins
+  tag: 2.426.3-lts-jdk11
+  pullPolicy: IfNotPresent
+
+## @param replicaCount Number of Jenkins replicas to deploy
+##
+replicaCount: 2
+
+## Jenkins configuration
+## @param jenkins.adminUser Jenkins admin username
+## @param jenkins.adminPassword Jenkins admin password
+## @param jenkins.javaOpts Java options for Jenkins
+##
+jenkins:
+  adminUser: admin
+  adminPassword: "ChangeMe123!"
+  javaOpts: "-Xmx2g -Xms2g"
+
+## @section Service parameters
+##
+
+## Service configuration
+## @param service.type Kubernetes Service type
+## @param service.port Service HTTP port
+## @param service.nodePort NodePort if service type is NodePort
+##
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  # nodePort: 30080
+
+## @section Ingress parameters
+##
+
+## Ingress configuration
+## @param ingress.enabled Enable ingress record generation
+## @param ingress.className IngressClass that will be used
+## @param ingress.host Default host for the ingress record
+## @param ingress.tls.enabled Enable TLS configuration
+## @param ingress.tls.secretName TLS secret name
+##
+ingress:
+  enabled: true
+  className: nginx
+  host: jenkins.example.com
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+  tls:
+    enabled: true
+    secretName: jenkins-tls
+
+## @section Persistence parameters
+##
+
+## Persistence configuration
+## @param persistence.enabled Enable persistence using PVC
+## @param persistence.storageClass Storage class of backing PVC
+## @param persistence.accessMode Access mode of backing PVC
+## @param persistence.size Size of backing PVC
+##
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteMany
+  size: 100Gi
+
+## @section Resources parameters
+##
+
+## Resource requests and limits
+## @param resources.requests.memory Memory request
+## @param resources.requests.cpu CPU request
+## @param resources.limits.memory Memory limit
+## @param resources.limits.cpu CPU limit
+##
+resources:
+  requests:
+    memory: "2Gi"
+    cpu: "1000m"
+  limits:
+    memory: "4Gi"
+    cpu: "2000m"
+
+## @section Security parameters
+##
+
+## Security context
+## @param securityContext.runAsUser User ID for the container
+## @param securityContext.runAsGroup Group ID for the container
+## @param securityContext.fsGroup Group ID for the volume
+##
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+## @section Scheduling parameters
+##
+
+## @param nodeSelector Node labels for pod assignment
+##
+nodeSelector: {}
+
+## @param tolerations Tolerations for pod assignment
+##
+tolerations: []
+
+## @param affinity Affinity for pod assignment
+##
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app
+            operator: In
+            values:
+            - jenkins
+        topologyKey: kubernetes.io/hostname
+
+## @section Monitoring parameters
+##
+
+## Monitoring configuration
+## @param monitoring.enabled Enable Prometheus metrics
+## @param monitoring.serviceMonitor.enabled Create ServiceMonitor resource
+##
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+    interval: 30s
+    scrapeTimeout: 10s
+
+## @section Backup parameters
+##
+
+## Backup configuration
+## @param backup.enabled Enable automated backups
+## @param backup.schedule Cron schedule for backups
+## @param backup.retention Number of backups to retain
+##
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  retention: 30
+  storageClass: ""
+  size: 100Gi

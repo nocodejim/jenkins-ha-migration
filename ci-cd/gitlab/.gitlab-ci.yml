@@ -1,0 +1,130 @@
+stages:
+  - validate
+  - test
+  - build
+  - security
+  - deploy
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+  KUBECTL_VERSION: "1.28.0"
+  HELM_VERSION: "3.13.0"
+
+.kubectl:
+  image: bitnami/kubectl:${KUBECTL_VERSION}
+  before_script:
+    - kubectl version --client
+
+.helm:
+  image: alpine/helm:${HELM_VERSION}
+  before_script:
+    - helm version
+
+# Validation Stage
+validate:yaml:
+  stage: validate
+  image: python:3.9-slim
+  before_script:
+    - pip install yamllint
+  script:
+    - yamllint -c .yamllint.yml .
+  except:
+    - tags
+
+validate:shell:
+  stage: validate
+  image: koalaman/shellcheck-alpine:latest
+  script:
+    - find . -name "*.sh" -type f | xargs shellcheck
+  except:
+    - tags
+
+# Test Stage
+test:helm:
+  stage: test
+  extends: .helm
+  script:
+    - helm lint kubernetes/helm
+    - helm template jenkins kubernetes/helm
+  except:
+    - tags
+
+test:docker:
+  stage: test
+  image: docker/compose:latest
+  script:
+    - cd docker-compose
+    - docker-compose config
+  except:
+    - tags
+
+# Security Stage
+security:trivy:
+  stage: security
+  image: aquasec/trivy:latest
+  script:
+    - trivy fs --security-checks vuln,config --severity HIGH,CRITICAL .
+  allow_failure: true
+  except:
+    - tags
+
+security:checkov:
+  stage: security
+  image: bridgecrew/checkov:latest
+  script:
+    - checkov -d . --framework kubernetes,helm,dockerfile --output cli --output junitxml --output-file-path checkov-report.xml
+  artifacts:
+    reports:
+      junit: checkov-report.xml
+  allow_failure: true
+  except:
+    - tags
+
+# Build Stage
+build:docker:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
+    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - docker push $CI_REGISTRY_IMAGE:latest
+  only:
+    - main
+    - develop
+
+# Deploy Stage
+deploy:staging:
+  stage: deploy
+  extends: .helm
+  environment:
+    name: staging
+    url: https://jenkins-staging.example.com
+  script:
+    - helm upgrade --install jenkins-staging ./kubernetes/helm
+      --namespace jenkins-staging
+      --create-namespace
+      --set image.tag=$CI_COMMIT_SHA
+      --values kubernetes/helm/values-staging.yaml
+  only:
+    - develop
+
+deploy:production:
+  stage: deploy
+  extends: .helm
+  environment:
+    name: production
+    url: https://jenkins.example.com
+  script:
+    - helm upgrade --install jenkins ./kubernetes/helm
+      --namespace jenkins-prod
+      --create-namespace
+      --set image.tag=$CI_COMMIT_SHA
+      --values kubernetes/helm/values-prod.yaml
+  only:
+    - main
+  when: manual

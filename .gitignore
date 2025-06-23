@@ -1,0 +1,68 @@
+# Local Jenkins data
+jenkins_home/
+*/jenkins_home/
+
+# Certificates
+*.pem
+*.key
+*.crt
+*.cer
+*.pfx
+*.p12
+certs/*
+!certs/.gitkeep
+
+# Backup files
+*.tar.gz
+*.zip
+backup/*
+!backup/.gitkeep
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.log
+
+# Terraform state files
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Kubernetes secrets
+*-secret.yaml
+*-secrets.yaml
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+ENV/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
