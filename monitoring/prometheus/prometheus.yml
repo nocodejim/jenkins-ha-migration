@@ -17,16 +17,25 @@ scrape_configs:
       - targets: ['localhost:9090']
 
   - job_name: 'jenkins'
-    metrics_path: '/prometheus'
+    # The Jenkins service in docker-compose.yml is named 'jenkins'
+    # and the Prometheus plugin exposes metrics at /jenkins/prometheus
+    # by default when Jenkins is accessed via a prefix.
+    # However, our JENKINS_OPTS for the plugin is just 'prometheus:2.0.7',
+    # which usually makes it available at /prometheus.
+    # If Jenkins is running with a context path (e.g., /jenkins),
+    # the metrics path might be /jenkins/prometheus.
+    # The `jenkins/jenkins:lts-jdk11` image with `JENKINS_OPTS="--prefix=/jenkins --plugin=prometheus:2.0.7"`
+    # makes it available at /jenkins/prometheus
+    metrics_path: '/jenkins/prometheus'
     static_configs:
-      - targets: 
-          - 'jenkins-1:8080'
-          - 'jenkins-2:8080'
+      - targets:
+          - 'jenkins:8080' # Matches the service name in docker-compose.yml
 
   - job_name: 'node'
     static_configs:
-      - targets: ['node-exporter:9100']
+      - targets: ['node-exporter:9100'] # For host metrics via node-exporter
 
-  - job_name: 'nginx'
-    static_configs:
-      - targets: ['nginx:9113']
+  # Commenting out nginx target as it's not defined in the current scope.
+  # - job_name: 'nginx'
+  #   static_configs:
+  #     - targets: ['nginx:9113']

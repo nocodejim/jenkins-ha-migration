@@ -1,0 +1,75 @@
+global:
+  # The default SMTP From header field.
+  # smtp_from: 'alertmanager@example.org'
+  # The default SMTP smarthost used for sending emails, including port number.
+  # smtp_smarthost: 'localhost:25'
+  # The default SMTP Auth username.
+  # smtp_auth_username: 'alertmanager'
+  # The default SMTP Auth password.
+  # smtp_auth_password: 'password'
+  # The default hostname for Alertmanager instances.
+  # resolve_timeout: 5m
+
+# Route defines a node in a routing tree and the receivers for that node.
+# All alerts enter the routing tree at the root route.
+route:
+  # The root route must match all alerts.
+  # It can have child routes to match specific alerts.
+  receiver: 'default-receiver' # Default receiver for all alerts
+  group_by: ['alertname', 'cluster', 'service'] # How to group alerts
+  # How long to initially wait to send a notification for a group of alerts.
+  # Allows to wait for an outage to resolve before the first notification is sent.
+  group_wait: 30s
+  # How long to wait before sending a notification about new alerts that
+  # are added to a group of alerts for which an initial notification has already been sent.
+  group_interval: 5m
+  # How long to wait before sending a notification again if it has already
+  # been sent successfully for an alert.
+  repeat_interval: 4h
+
+  # Child routes can be defined here.
+  # routes:
+  #   - match:
+  #       severity: 'critical'
+  #     receiver: 'critical-receiver'
+  #   - match_re:
+  #       service: ^(foo1|foo2|baz)$
+  #     receiver: 'team-X-pager'
+
+# A list of notification receivers.
+receivers:
+  - name: 'default-receiver'
+    # This is a placeholder. In a real setup, you would configure
+    # email_configs, slack_configs, pagerduty_configs, webhook_configs, etc.
+    # For now, we'll use a webhook that just logs to stdout or a known endpoint.
+    # This example uses a webhook that will likely fail but allows Alertmanager to start.
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook' # A dummy webhook target
+
+# Inhibition rules allow to mute a set of alerts given that another alert is firing.
+# inhibit_rules:
+#   - source_match:
+#       severity: 'critical'
+#     target_match:
+#       severity: 'warning'
+#     # Apply inhibition if the alertname is the same.
+#     equal: ['alertname', 'cluster']
+
+# Templates for notifications.
+# templates:
+# - '/etc/alertmanager/template/*.tmpl'
+
+# The directory from which Alertmanager loads configuration files.
+# By default, this is the directory where the Alertmanager binary is run.
+# config_file: /etc/alertmanager/alertmanager.yml # This is usually set via command-line flag
+
+# The Alertmanager data directory.
+# data_dir: /alertmanager # This is usually set via command-line flag
+
+# Log level.
+# log_level: info
+
+# This is a very basic configuration. For a production system, you would
+# configure appropriate receivers (email, Slack, PagerDuty, etc.) and routing rules.
+# The volume for this file is already mapped in docker-compose.yml:
+# ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro

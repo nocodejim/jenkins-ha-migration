@@ -1,0 +1,23 @@
+# This file is processed by Grafana to automatically configure the Prometheus datasource
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy # Access Prometheus through the Grafana backend
+    url: http://prometheus:9090 # URL of the Prometheus server
+    isDefault: true # Set as the default datasource
+    editable: true # Allow users to edit the datasource in the Grafana UI if needed
+    jsonData:
+      timeInterval: "15s" # How often Grafana queries Prometheus
+      # For Docker Compose, if Grafana and Prometheus are on the same network,
+      # use the service name 'prometheus'. If they are on different networks or
+      # Prometheus is not containerized, use the appropriate IP/hostname.
+      # Example for different scrape intervals:
+      # queryTimeout: '60s'
+      # httpMethod: 'POST'
+      # manageAlerts: true # If Grafana should manage Prometheus alerts
+      # prometheusType: 'Prometheus'
+      # prometheusVersion: '2.x' # Or your specific version
+    version: 1

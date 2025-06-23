@@ -16,6 +16,8 @@ services:
     restart: unless-stopped
     networks:
       - monitoring
+    depends_on:
+      - jenkins # Ensure Jenkins starts before Prometheus tries to scrape it
 
   grafana:
     image: grafana/grafana:latest
@@ -28,11 +30,13 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./grafana/provisioning/:/etc/grafana/provisioning/:ro
+      - ./grafana/dashboards/:/var/lib/grafana/dashboards/:ro # Ensure dashboards are available
     restart: unless-stopped
     networks:
       - monitoring
+    depends_on:
+      - prometheus
 
   alertmanager:
     image: prom/alertmanager:latest
@@ -49,8 +53,10 @@ services:
   node-exporter:
     image: prom/node-exporter:latest
     container_name: node-exporter
-    ports:
-      - "9100:9100"
+    # No ports needed if only Prometheus in the same network accesses it.
+    # If external access to node-exporter is needed, uncomment the ports.
+    # ports:
+    #   - "9100:9100"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -63,12 +69,27 @@ services:
     networks:
       - monitoring
 
+  jenkins:
+    image: jenkins/jenkins:lts-jdk11
+    container_name: jenkins
+    ports:
+      - "8080:8080" # For UI access and Prometheus scraping
+      - "50000:50000" # For Jenkins agents
+    environment:
+      - JENKINS_OPTS=--enable-access-log --httpPort=8080 --prefix=/jenkins --plugin=prometheus:2.0.7 # Install and configure prometheus plugin
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false # Skip setup wizard for automation
+    volumes:
+      - jenkins_data:/var/jenkins_home
+    networks:
+      - monitoring
+    restart: unless-stopped
+
 volumes:
   prometheus_data:
   grafana_data:
   alertmanager_data:
+  jenkins_data: # Persistent data for Jenkins
 
 networks:
   monitoring:
-    external: true
-    name: jenkins-ha_jenkins-net
+    driver: bridge # Changed from external to bridge
